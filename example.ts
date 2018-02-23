@@ -1,9 +1,13 @@
+// Run this program from the command-line using ts-node
+//
+//   npm install -g ts-node
+//   ts-node example.ts
+//
 // <Boilerplate>
-let pr = require("./src/api");
-let { IS_NODE } = require("./src/util");
-async function train(maxSteps = 0) {
+import * as pr from "./src/api";
+import { IS_NODE } from "./src/util";
+export async function train(maxSteps = 0) {
 // </Boilerplate>
-
 
   // Load mnist asynchronously, with a batch size of 128 and
   // repeat the dataset for 100 epochs.
@@ -46,10 +50,8 @@ async function train(maxSteps = 0) {
   // Before the process exits, Propel will ensure that the parameters are saved
   // to disk in the experiment's directory.
 
-
 // <Boilerplate>
 }
-exports.train = train;
 if (IS_NODE && require.main === module) {
   train(1000);
 }

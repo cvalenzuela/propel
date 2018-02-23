@@ -27,7 +27,7 @@ import { gradParams } from "./backprop";
 import * as format from "./format";
 import { Params, params as createParams } from "./params";
 import { gc, NamedTensors, Tensor } from "./tensor";
-import { assert, delay } from "./util";
+import { assert } from "./util";
 
 export async function experiment(name: string, opts = {}): Promise<Experiment> {
   const exp = new Experiment(name);
@@ -36,7 +36,7 @@ export async function experiment(name: string, opts = {}): Promise<Experiment> {
 }
 
 type PrintArgs = Array<number | string | Tensor>;
-let lastPrint: Promise<string> = null;
+let lastPrint: Promise<void> = Promise.resolve();
 let printWaitCount = 0;
 
 /** A convenience function for printing tensors without calling dataSync on
@@ -49,34 +49,23 @@ export async function print(...args: PrintArgs): Promise<void> {
   // Drop prints if we get too backed up.
   if (printWaitCount > 100) {
     console.log("drop print");
-    await delay(0);
     return;
   }
-  const promise = printHelper(...args);
   // All this is to make sure that log items are in the order they came.
-  if (lastPrint == null) {
-    lastPrint = promise;
-    lastPrint.then(() => {
-      lastPrint = null;
-    });
-  }
   printWaitCount++;
-  lastPrint.then(async(_) => {
-    console.log(await promise);
+  lastPrint = lastPrint.then(async() => {
+    console.log(await printHelper(...args));
     printWaitCount--;
   });
-  await promise;
+  await lastPrint;
 }
 
 async function printHelper(...args: PrintArgs): Promise<string> {
   const strings = await Promise.all(args.map(async(arg) => {
-    if (typeof arg === "string") {
-      return arg;
-    } else if (typeof arg === "number") {
-      return String(arg);
+    if (arg instanceof Tensor) {
+      return format.toString(arg.shape, await arg.data());
     } else {
-      const data = await arg.data();
-      return format.toString(arg.shape, data);
+      return arg;
     }
   }));
   return strings.join(" ");
@@ -133,8 +122,7 @@ class Experiment {
       optimizer(opts, this.currentParams, grads);
     });
 
-    await print("step", this.step, "loss", loss);
-    loss.dispose();
+    print("step", this.step, "loss", loss).then(() => loss.dispose());
   }
 
   /** Performs SGD given the loss and current parameters. */
